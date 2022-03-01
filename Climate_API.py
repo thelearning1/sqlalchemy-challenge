@@ -25,21 +25,14 @@ app = Flask(__name__)
 def index():
     '''List all routes in api'''
 
-    #variable...ize all routes for easier modification
-    precip_page = '/api/v1.0/precipitation'
-    stations_page ='/api/v1.0/stations' 
-    tempobs_page = '/api/v1.0/tobs'
-    startdate_page = '/api/v1.0/startdate'
-    enddate_page = '/enddate'
-
     return (
         f"Hawaii climate application, version 1.0 is now active.<br/>" 
         f"Available Routes:<br/>"
-        f"{precip_page}<br/>"
-        f"{stations_page}<br/>"
-        f"{tempobs_page}<br/>"
-        f"{startdate_page}'YYYY-MM-DD'<br/>"
-        f"{startdate_page}'YYYY-MM-DD'{enddate_page}'YYYY-MM-DD'<br/>"
+        f"See a list of raw precip data: /api/v1.0/precipitation<br/>"
+        f"See a list of the stations: /api/v1.0/stations<br/>"
+        f"See temperature observations from the most active station: /api/v1.0/tobs<br/>"
+        f"Input the start date to see summary stats on and since that date: /api/v1.0/YYYY-MM-DD<br/>"
+        f"Input the start and end dates to see summary stats between them (inclusive): /api/v1.0/YYYY-MM-DD/YYYY-MM-DD<br/>"
     )
 ####################################################################################
 @app.route('/api/v1.0/precipitation')
@@ -142,12 +135,13 @@ def stations():
     return jsonify(temps)
 
 ####################################################################################
-@app.route("/api/v1.0/startdate<startdate>")
-def start_date_only(startdate):
+@app.route("/api/v1.0/<start>")
+def start_date_only(start):
+    
     session = Session(engine)
 
     results = session.query(func.avg(Measurement.tobs),func.min(Measurement.tobs),func.max(Measurement.tobs)).\
-        filter(Measurement.date >= startdate).all()
+        filter(Measurement.date >= start).all()
        
     #query the table with a filter, filling in the input date with a '>'
     session.close
@@ -172,14 +166,15 @@ def start_date_only(startdate):
     # for all dates greater than and equal to the start date.
 
 ####################################################################################
-app.route("/api/v1.0/startdate<startdate>/enddate<enddate>")
-def start_and_end_dates(startdate,enddate):
+app.route("/api/v1.0/<start>/<end>")
+def start_and_end_dates(start,end):
+    
     session = Session(engine)
 
     #same as above but with another filter
     results = session.query(func.avg(Measurement.tobs),func.min(Measurement.tobs),func.max(Measurement.tobs)).\
-        filter(Measurement.date >= startdate).\
-        filter(Measurement.date <= enddate).all()
+        filter(Measurement.date >= start).\
+        filter(Measurement.date <= end).all()
 
     session.close
 
