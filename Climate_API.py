@@ -24,14 +24,22 @@ app = Flask(__name__)
 @app.route('/')
 def index():
     '''List all routes in api'''
+
+    #variable...ize all routes for easier modification
+    precip_page = '/api/v1.0/precipitation'
+    stations_page ='/api/v1.0/stations' 
+    tempobs_page = '/api/v1.0/tobs'
+    startdate_page = '/api/v1.0/startdate'
+    enddate_page = '/enddate'
+
     return (
         f"Hawaii climate application, version 1.0 is now active.<br/>" 
         f"Available Routes:<br/>"
-        f"/api/v1.0/precipitation<br/>"
-        f"/api/v1.0/stations<br/>"
-        f"/api/v1.0/tobs<br/>"
-        f"/api/v1.0/<start><br/>"
-        f"/api/v1.0/<start>/<end><br/>"
+        f"{precip_page}<br/>"
+        f"{stations_page}<br/>"
+        f"{tempobs_page}<br/>"
+        f"{startdate_page}'YYYY-MM-DD'<br/>"
+        f"{startdate_page}'YYYY-MM-DD'{enddate_page}'YYYY-MM-DD'<br/>"
     )
 ####################################################################################
 @app.route('/api/v1.0/precipitation')
@@ -68,12 +76,13 @@ def precipitation():
         all_results.append(precip_dict)
 
     return (
-        jsonify(precip_dict)
+        jsonify(all_results)
     )
 
 ####################################################################################
 @app.route('/api/v1.0/stations')
-def stations():
+def stations_list():
+
     session = Session(engine)
 
     results = session.query(Station.station,Station.name).all()
@@ -110,21 +119,14 @@ def stations():
 
 
     #calculate the most active station
-    ###NOTE: The rubric declares the station USC00519281 as the most active because it has the most lifetime records
-    ### However, in the timeframe of the past 12 months being analyzed, 
-    ### the station USC00519397 has more records with 361 over USC00519281's 352
-    ### I wrote this long query that I'm very proud of and will submit the app with it. 
-    ### to return the station with the most lifetime queries, simply remove the line(120)
-    ### beginning with '.filter' in the below, adjacent codeblock. The code will function to the rubric then.
     activest = session.query(Measurement.station,func.count(Measurement.station).label('qty'))\
-    .filter(func.strftime('%Y,%m,%d',Measurement.date) >= func.strftime('%Y,%m,%d',year_ago))\
     .group_by(Measurement.station).order_by(desc('qty')).first()
     activest = activest[0]
 
     #make query
     results = session.query(Measurement.date,Measurement.tobs).\
         filter(Measurement.station == activest).\
-        filter(func.strftime('%Y,%m,%d',Measurement.date) >= func.strftime('%Y,%m,%d',year_ago)).\
+        filter(Measurement.date >= year_ago).\
         order_by(Measurement.date).all()
 
     session.close
@@ -137,54 +139,67 @@ def stations():
         tobs_dict['tobs'] = tobs
         temps.append(tobs_dict)
 
-    return #Query the dates and temperature observations of the most active station for the last year of data.
-
-#   * Return a JSON list of temperature observations (TOBS) for the previous year.
+    return jsonify(temps)
 
 ####################################################################################
-@app.route("/api/v1.0/<start>")
-def start_date_only(start):
+@app.route("/api/v1.0/startdate<startdate>")
+def start_date_only(startdate):
     session = Session(engine)
 
-    results = session.query
-    #choose how the input needs to be formatted.
+    results = session.query(func.avg(Measurement.tobs),func.min(Measurement.tobs),func.max(Measurement.tobs)).\
+        filter(Measurement.date >= startdate).all()
+       
     #query the table with a filter, filling in the input date with a '>'
-    #put all tobs values into a list
-    #run .mean, .min, and .max on it, putting those values into another list.
-
     session.close
-    return
+
+    tempdata = []
+    
+    for avg,min,max in results:
+        tobs_dict = {}
+        tobs_dict['Average Temperature post start date'] = avg
+        tobs_dict['Minimum Temperature post start date'] = min
+        tobs_dict['Maximum Temperature post start date'] = max
+        tempdata.append(tobs_dict)
+
+    return(
+        jsonify(tempdata)
+    )
+    # return(jsonify(results))
+        
+       
     # Return a JSON list of the minimum, the maximum, and the average temperature.
     #When given the start only, calculate `TMIN`, `TAVG`, and `TMAX` 
     # for all dates greater than and equal to the start date.
 
 ####################################################################################
-app.route('/api/v1.0/<start>/<end>')
-def start_and_end_dates():
+app.route("/api/v1.0/startdate<startdate>/enddate<enddate>")
+def start_and_end_dates(startdate,enddate):
     session = Session(engine)
 
-    results = 
+    #same as above but with another filter
+    results = session.query(func.avg(Measurement.tobs),func.min(Measurement.tobs),func.max(Measurement.tobs)).\
+        filter(Measurement.date >= startdate).\
+        filter(Measurement.date <= enddate).all()
 
     session.close
-    return
-    # Return a JSON list of the minimum temperature, the average temperature,
-    # and the max temperature for a given start or start-end range.
-    # When given the start and the end date, calculate the `TMIN`, `TAVG`, and `TMAX` 
-    # for dates between the start and end date inclusive.
+
+    #all the same as above
+    tempdata = []
+    
+    for avg,min,max in results:
+        tobs_dict = {}
+        tobs_dict['Average Temperature between and including start and end dates'] = avg
+        tobs_dict['Minimum Temperature between and including start and end dates'] = min
+        tobs_dict['Maximum Temperature between and including start and end dates'] = max
+        tempdata.append(tobs_dict)
+
+    return(
+        jsonify(tempdata)
+    )
+
+    
 
 
 ####################################################################################
 if __name__ == "__main__":
     app.run(debug=True)
-
-
-
-
-
-
-
-# ## Hints
-
-# * You will need to join the station and measurement tables for some of the queries.
-
-# * Use Flask `jsonify` to convert your API data into a valid JSON response obj
